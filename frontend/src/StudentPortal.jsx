@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import "./StudentPortal.css";
 
-const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
+const API = import.meta.env.VITE_API_URL || "/api";
 const navigation = [
   ["overview", "Overview", "◫"],
   ["browse", "Browse rooms", "▦"],
