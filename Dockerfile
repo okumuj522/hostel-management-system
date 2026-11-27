@@ -21,4 +21,4 @@ WORKDIR /app/hostel_system
 RUN python manage.py collectstatic --noinput
 
 EXPOSE 10000
-CMD ["sh", "-c", "python manage.py migrate && gunicorn hostel_system.wsgi:application --bind 0.0.0.0:${PORT:-10000}"]
+CMD ["sh", "-c", "python manage.py migrate && if [ -n \"$DJANGO_ADMIN_RESET_PASSWORD\" ]; then python manage.py reset_admin_password; fi && gunicorn hostel_system.wsgi:application --bind 0.0.0.0:${PORT:-10000}"]

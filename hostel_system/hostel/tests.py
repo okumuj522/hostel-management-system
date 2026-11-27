@@ -1,8 +1,67 @@
-from django.contrib.auth import get_user_model
+import os
 from datetime import timedelta
+from io import StringIO
+from unittest.mock import patch
+
+from django.contrib.auth import get_user_model
+from django.core.management import call_command, CommandError
+from django.test import TestCase
 from django.utils import timezone
 from .models import Allocation, Hall, MaintenanceRecord, Room, Semester, Student, TransferRequest
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
+
+
+class ResetAdminPasswordCommandTests(TestCase):
+	def test_creates_configured_superuser_without_logging_password(self):
+		password = "new-admin-password-123"
+		output = StringIO()
+		with patch.dict(
+			os.environ,
+			{
+				"DJANGO_SUPERUSER_USERNAME": "hosteladmin",
+				"DJANGO_ADMIN_RESET_PASSWORD": password,
+			},
+		):
+			call_command("reset_admin_password", stdout=output)
+
+		admin = get_user_model().objects.get(username="hosteladmin")
+		self.assertTrue(admin.check_password(password))
+		self.assertTrue(admin.is_active)
+		self.assertTrue(admin.is_staff)
+		self.assertTrue(admin.is_superuser)
+		self.assertNotIn(password, output.getvalue())
+
+	def test_resets_existing_account_and_requires_reset_password(self):
+		admin = get_user_model().objects.create_user(
+			username="hosteladmin",
+			password="old-password",
+			is_staff=False,
+		)
+		Token.objects.create(user=admin)
+		with patch.dict(
+			os.environ,
+			{
+				"DJANGO_SUPERUSER_USERNAME": "hosteladmin",
+				"DJANGO_ADMIN_RESET_PASSWORD": "replacement-password-456",
+			},
+		):
+			call_command("reset_admin_password", stdout=StringIO())
+
+		admin.refresh_from_db()
+		self.assertTrue(admin.check_password("replacement-password-456"))
+		self.assertTrue(admin.is_staff)
+		self.assertTrue(admin.is_superuser)
+		self.assertFalse(Token.objects.filter(user=admin).exists())
+
+		with patch.dict(
+			os.environ,
+			{"DJANGO_SUPERUSER_USERNAME": "hosteladmin"},
+			clear=False,
+		):
+			os.environ.pop("DJANGO_ADMIN_RESET_PASSWORD", None)
+			with self.assertRaises(CommandError):
+				call_command("reset_admin_password", stdout=StringIO())
 
 
 class AdminApiTests(APITestCase):
